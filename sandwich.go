@@ -13,6 +13,42 @@ import (
 	"strconv"
 )
 
+type Cut2D struct {
+	File string  // path to SVG file
+	X    float64 // x offset, from left
+	Y    float64 // y offset, from top
+}
+
+type Cut3D struct {
+	Zmin int // where the cut should start, lowest point on Z axis, in mm
+	Zmax int // where the cut should end, lowest point on Z axis, in mm
+	Cut  Cut2D
+}
+
+type Layer struct {
+	Zmin int     // where the layer should start, lowest point on Z axis, in mm
+	Zmax int     // where the layer should start, lowest point on Z axis, in mm
+	Cuts []Cut2D // All the cuts included in the layer
+}
+
+// Utility string dump functions (toString equivalents), used for debug.
+
+func (c Cut2D) String() string {
+	return fmt.Sprintf("%v at (%v,%v)", c.File, c.X, c.Y)
+}
+
+func (c Cut3D) String() string {
+	return fmt.Sprintf("[%v-%v] %v", c.Zmin, c.Zmax, Cut2DToString(c.Cut))
+}
+
+func (c Layer) String() string {
+	representation := fmt.Sprintf("[%v-%v] : ", l.Zmin, l.Zmax)
+	for _, c := range l.Cuts {
+		representation += Cut2DToString(c) + "\n"
+	}
+	return representation + "\n"
+}
+
 // importSvgElementsFromFile reads an SVG and imports all the elements at (x,y) of currentDocument
 func importSvgElementsFromFile(currentDocument *svg.SVG, x, y float64, filename string) {
 
@@ -36,40 +72,13 @@ func importSvgElementsFromFile(currentDocument *svg.SVG, x, y float64, filename 
 	currentDocument.Gend()
 }
 
-type Cut2D struct {
-	File string  // from type's manifest
-	X    float64 // x position within the device
-	Y    float64 // x position within the device
-}
-
-type Cut3D struct {
-	Zmin int   // from type's manifest
-	Zmax int   // from type's manifest
-	Cut  Cut2D // TODO : rename ?
-}
-
-type Layer struct {
-	Zmin int     // from type's manifest
-	Zmax int     // from type's manifest
-	Cuts []Cut2D // TODO : rename ?
-}
-
-func Cut2DToString(c Cut2D) string {
-	return fmt.Sprintf("%v at (%v,%v)", c.File, c.X, c.Y)
-}
-
-func Cut3DToString(c Cut3D) string {
-	return fmt.Sprintf("[%v-%v] %v", c.Zmin, c.Zmax, Cut2DToString(c.Cut))
-}
-
-func LayerToString(l Layer) string {
-	representation := fmt.Sprintf("[%v-%v] : ", l.Zmin, l.Zmax)
-	for _, c := range l.Cuts {
-		representation += Cut2DToString(c) + "\n"
-	}
-	return representation + "\n"
-}
-
+// SliceByMM, given an array of Cut3D, creates an array of layers, one for every mm in the Z axis.
+// The number of layers generated will therefore be the height, in mm, of the highest Cut3D object
+// in the Z axis. If the highest Cut3D reaches 4mm, then 4 layers are generated (1mm,2mm,3mm,4mm).
+// Iterating on every Cut3D, SliceByMM copies all the Cut2D objects included in the Cut3D object
+// into every layer that the Cut3D trepasses.
+// So if a Cut3D object with Zmin=2 and Zmax=4 is encountered, then its Cut2D objects are copied into
+// the layer for Z 2mm, 3mm, and 4mm.
 func SliceByMM(cuts3d []Cut3D) []Layer {
 
 	var layers []Layer
