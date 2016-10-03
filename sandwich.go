@@ -38,25 +38,25 @@ func (c Cut2D) String() string {
 }
 
 func (c Cut3D) String() string {
-	return fmt.Sprintf("[%v-%v] %v", c.Zmin, c.Zmax, Cut2DToString(c.Cut))
+	return fmt.Sprintf("[%v-%v] %v", c.Zmin, c.Zmax, c.Cut)
 }
 
-func (c Layer) String() string {
+func (l Layer) String() string {
 	representation := fmt.Sprintf("[%v-%v] : ", l.Zmin, l.Zmax)
 	for _, c := range l.Cuts {
-		representation += Cut2DToString(c) + "\n"
+		representation += fmt.Sprintf("%v\n", c)
 	}
 	return representation + "\n"
 }
 
 // importSvgElementsFromFile reads an SVG and imports all the elements at (x,y) of currentDocument
-func importSvgElementsFromFile(currentDocument *svg.SVG, x, y float64, filename string) {
+func importSvgElementsFromFile(currentDocument *svg.SVG, x, y float64, fileName string) {
 
 	var s struct {
 		Doc string `xml:",innerxml"`
 	}
 
-	f, err := os.Open(filename)
+	f, err := os.Open(fileName)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return
@@ -81,13 +81,13 @@ func importSvgElementsFromFile(currentDocument *svg.SVG, x, y float64, filename 
 //
 // So if a Cut3D object with Zmin=2 and Zmax=4 is encountered, then its Cut2D objects are copied into
 // the layer for Z 2mm, 3mm, and 4mm.
-func SliceByMM(cuts3d []Cut3D) []Layer {
+func SliceByMM(cuts []Cut3D) []Layer {
 
 	var layers []Layer
 
 	mmArranged2DCuts := make(map[int][]Cut2D)
 
-	for _, cut3D := range cuts3d {
+	for _, cut3D := range cuts {
 		for i := cut3D.Zmin; i <= cut3D.Zmax; i++ {
 			//_, thereIsAnotherAlready := mmArranged2DCuts[i]
 			// if !thereIsAnotherAlready {
@@ -117,11 +117,11 @@ func areCuts2DEquivalent(a []Cut2D, b []Cut2D) bool {
 	return true
 }
 
-func MergeEqualLayers(inputLayers []Layer) []Layer {
+func MergeEqualLayers(layers []Layer) []Layer {
 
 	var filtered []Layer
 
-	for _, currentLayer := range inputLayers {
+	for _, currentLayer := range layers {
 
 		// Check if another is already in and can be merged
 		merged := false
@@ -139,12 +139,12 @@ func MergeEqualLayers(inputLayers []Layer) []Layer {
 	return filtered
 }
 
-func WriteLayersToFile(dir_path string, layers []Layer) {
+func WriteLayersToFile(outDirectory string, layers []Layer) {
 	for _, l := range layers {
 		fmt.Println("++++ This filtered layer is [", l.Zmin, "-", l.Zmax, "]")
 
 		// Creating empty drawing
-		f, _ := os.Create(filepath.Join(dir_path, "/design-"+strconv.Itoa(l.Zmin)+"-"+strconv.Itoa(l.Zmax)+".svg"))
+		f, _ := os.Create(filepath.Join(outDirectory, "/design-"+strconv.Itoa(l.Zmin)+"-"+strconv.Itoa(l.Zmax)+".svg"))
 		defer f.Close()
 
 		canvas := svg.New(f)
