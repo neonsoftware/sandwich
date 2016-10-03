@@ -37,52 +37,52 @@ func importSvgElementsFromFile(currentDocument *svg.SVG, x, y float64, filename 
 }
 
 type Cut2D struct {
-	file string  // from type's manifest
-	x    float64 // x position within the device
-	y    float64 // x position within the device
+	File string  // from type's manifest
+	X    float64 // x position within the device
+	Y    float64 // x position within the device
 }
 
 type Cut3D struct {
-	zMin int   // from type's manifest
-	zMax int   // from type's manifest
-	cut  Cut2D // TODO : rename ?
+	Zmin int   // from type's manifest
+	Zmax int   // from type's manifest
+	Cut  Cut2D // TODO : rename ?
 }
 
 type Layer struct {
-	zMin int     // from type's manifest
-	zMax int     // from type's manifest
-	cuts []Cut2D // TODO : rename ?
+	Zmin int     // from type's manifest
+	Zmax int     // from type's manifest
+	Cuts []Cut2D // TODO : rename ?
 }
 
 func Cut2DToString(c Cut2D) string {
-	return fmt.Sprintf("%v at (%v,%v)", c.file, c.x, c.y)
+	return fmt.Sprintf("%v at (%v,%v)", c.File, c.X, c.Y)
 }
 
 func Cut3DToString(c Cut3D) string {
-	return fmt.Sprintf("[%v-%v] %v", c.zMin, c.zMax, Cut2DToString(c.cut))
+	return fmt.Sprintf("[%v-%v] %v", c.Zmin, c.Zmax, Cut2DToString(c.Cut))
 }
 
 func LayerToString(l Layer) string {
-	representation := fmt.Sprintf("[%v-%v] : ", l.zMin, l.zMax)
-	for _, c := range l.cuts {
+	representation := fmt.Sprintf("[%v-%v] : ", l.Zmin, l.Zmax)
+	for _, c := range l.Cuts {
 		representation += Cut2DToString(c) + "\n"
 	}
 	return representation + "\n"
 }
 
-func sliceByMM(cuts3d []Cut3D) []Layer {
+func SliceByMM(cuts3d []Cut3D) []Layer {
 
 	var layers []Layer
 
 	mmArranged2DCuts := make(map[int][]Cut2D)
 
 	for _, cut3D := range cuts3d {
-		for i := cut3D.zMin; i <= cut3D.zMax; i++ {
+		for i := cut3D.Zmin; i <= cut3D.Zmax; i++ {
 			//_, thereIsAnotherAlready := mmArranged2DCuts[i]
 			// if !thereIsAnotherAlready {
 			// 	mmArranged2DCuts[i] = make([]Cut2D, 0)
 			// }
-			mmArranged2DCuts[i] = append(mmArranged2DCuts[i], cut3D.cut)
+			mmArranged2DCuts[i] = append(mmArranged2DCuts[i], cut3D.Cut)
 		}
 	}
 
@@ -106,7 +106,7 @@ func areCuts2DEquivalent(a []Cut2D, b []Cut2D) bool {
 	return true
 }
 
-func mergeEqualLayers(inputLayers []Layer) []Layer {
+func MergeEqualLayers(inputLayers []Layer) []Layer {
 
 	var filtered []Layer
 
@@ -115,8 +115,8 @@ func mergeEqualLayers(inputLayers []Layer) []Layer {
 		// Check if another is already in and can be merged
 		merged := false
 		for indexOfAlreadyPresentLayer, _ := range filtered {
-			if areCuts2DEquivalent(currentLayer.cuts, filtered[indexOfAlreadyPresentLayer].cuts) {
-				filtered[indexOfAlreadyPresentLayer].zMax = currentLayer.zMax
+			if areCuts2DEquivalent(currentLayer.Cuts, filtered[indexOfAlreadyPresentLayer].Cuts) {
+				filtered[indexOfAlreadyPresentLayer].Zmax = currentLayer.Zmax
 				merged = true
 			}
 		}
@@ -128,20 +128,20 @@ func mergeEqualLayers(inputLayers []Layer) []Layer {
 	return filtered
 }
 
-func writeLayersToFile(dir_path string, layers []Layer) {
+func WriteLayersToFile(dir_path string, layers []Layer) {
 	for _, l := range layers {
-		fmt.Println("++++ This filtered layer is [", l.zMin, "-", l.zMax, "]")
+		fmt.Println("++++ This filtered layer is [", l.Zmin, "-", l.Zmax, "]")
 
 		// Creating empty drawing
-		f, _ := os.Create(filepath.Join(dir_path, "/design-"+strconv.Itoa(l.zMin)+"-"+strconv.Itoa(l.zMax)+".svg"))
+		f, _ := os.Create(filepath.Join(dir_path, "/design-"+strconv.Itoa(l.Zmin)+"-"+strconv.Itoa(l.Zmax)+".svg"))
 		defer f.Close()
 
 		canvas := svg.New(f)
 		canvas.StartviewUnit(200.0, 200.0, "mm", 0, 0, 200, 200) // TODO : parametric size, of course
 		canvas.Group(`stroke="rgb(255,0,0)" stroke-width="1pt" fill="none"`)
 
-		for _, cut := range l.cuts {
-			importSvgElementsFromFile(canvas, cut.x, cut.y, cut.file)
+		for _, cut := range l.Cuts {
+			importSvgElementsFromFile(canvas, cut.X, cut.Y, cut.File)
 		}
 
 		canvas.Gend()
