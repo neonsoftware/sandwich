@@ -73,10 +73,12 @@ func importSvgElementsFromFile(currentDocument *svg.SVG, x, y float64, filename 
 }
 
 // SliceByMM, given an array of Cut3D, creates an array of layers, one for every mm in the Z axis.
+//
 // The number of layers generated will therefore be the height, in mm, of the highest Cut3D object
 // in the Z axis. If the highest Cut3D reaches 4mm, then 4 layers are generated (1mm,2mm,3mm,4mm).
 // Iterating on every Cut3D, SliceByMM copies all the Cut2D objects included in the Cut3D object
 // into every layer that the Cut3D trepasses.
+//
 // So if a Cut3D object with Zmin=2 and Zmax=4 is encountered, then its Cut2D objects are copied into
 // the layer for Z 2mm, 3mm, and 4mm.
 func SliceByMM(cuts3d []Cut3D) []Layer {
