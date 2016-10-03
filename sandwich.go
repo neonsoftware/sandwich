@@ -13,10 +13,16 @@ import (
 	"strconv"
 )
 
+// Basic Types
+
 type Cut2D struct {
 	File string  // path to SVG file
 	X    float64 // x offset, from left
 	Y    float64 // y offset, from top
+}
+
+func (c Cut2D) String() string {
+	return fmt.Sprintf("%v at (%v,%v)", c.File, c.X, c.Y)
 }
 
 type Cut3D struct {
@@ -25,28 +31,22 @@ type Cut3D struct {
 	Cut  Cut2D
 }
 
+func (c Cut3D) String() string {
+	return fmt.Sprintf("[%v-%v] %v", c.Zmin, c.Zmax, c.Cut)
+}
+
 type Layer struct {
 	Zmin int     // where the layer should start, lowest point on Z axis, in mm
 	Zmax int     // where the layer should start, lowest point on Z axis, in mm
 	Cuts []Cut2D // All the cuts included in the layer
 }
 
-// Utility string dump functions (toString equivalents), used for debug.
-
-func (c Cut2D) String() string {
-	return fmt.Sprintf("%v at (%v,%v)", c.File, c.X, c.Y)
-}
-
-func (c Cut3D) String() string {
-	return fmt.Sprintf("[%v-%v] %v", c.Zmin, c.Zmax, c.Cut)
-}
-
 func (l Layer) String() string {
-	representation := fmt.Sprintf("[%v-%v] : ", l.Zmin, l.Zmax)
+	var inner string
 	for _, c := range l.Cuts {
-		representation += fmt.Sprintf("%v\n", c)
+		inner += fmt.Sprintf("%v\n", c)
 	}
-	return representation + "\n"
+	return fmt.Sprintf("[%v-%v] : %v\n", l.Zmin, l.Zmax, inner)
 }
 
 // importSvgElementsFromFile reads an SVG and imports all the elements at (x,y) of currentDocument
@@ -70,6 +70,19 @@ func importSvgElementsFromFile(currentDocument *svg.SVG, x, y float64, fileName 
 	currentDocument.Group(fmt.Sprintf(`transform="translate(%.2f,%.2f)"`, x, y))
 	io.WriteString(currentDocument.Writer, s.Doc)
 	currentDocument.Gend()
+}
+
+func areCuts2DEquivalent(a []Cut2D, b []Cut2D) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for i, _ := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // SliceByMM, given an array of Cut3D, creates an array of layers, one for every mm in the Z axis.
@@ -104,20 +117,11 @@ func SliceByMM(cuts []Cut3D) []Layer {
 	return layers
 }
 
-func areCuts2DEquivalent(a []Cut2D, b []Cut2D) bool {
-	if len(a) != len(b) {
-		return false
-	}
-
-	for i, _ := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}
-
+// MergeEqualLayers recognizes consecutive equivalent layers, which will be merged into a unique
+// layer that combines the heights of the two.
 func MergeEqualLayers(layers []Layer) []Layer {
+
+	// TODO : take into account the non-consecutive equivalent. They will not have to be merged
 
 	var filtered []Layer
 
@@ -139,6 +143,10 @@ func MergeEqualLayers(layers []Layer) []Layer {
 	return filtered
 }
 
+// WriteLayersToFile, given a list of layers passed as input, writes an SVG file per layer.
+// Such files will be written in the directory outDirectory passed as input.
+// The format used for the SVG file names will contain the Zaxis, min and max, of the layer:
+// <outDirectory>/design-A-B-mm.svg, where A is the min Z, and B is the max Z.
 func WriteLayersToFile(outDirectory string, layers []Layer) {
 	for _, l := range layers {
 		fmt.Println("++++ This filtered layer is [", l.Zmin, "-", l.Zmax, "]")
