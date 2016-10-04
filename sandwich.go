@@ -50,7 +50,7 @@ func (l Layer) String() string {
 }
 
 // importSvgElementsFromFile reads an SVG and imports all the elements at (x,y) of currentDocument
-func importSvgElementsFromFile(currentDocument *svg.SVG, x, y float64, fileName string) {
+func importSvgElementsFromFile(currentDocument *svg.SVG, x, y float64, fileName string, extra string) {
 
 	var s struct {
 		Doc string `xml:",innerxml"`
@@ -67,7 +67,7 @@ func importSvgElementsFromFile(currentDocument *svg.SVG, x, y float64, fileName 
 		return
 	}
 
-	currentDocument.Group(fmt.Sprintf(`transform="translate(%.2f,%.2f)"`, x, y))
+	currentDocument.Group(fmt.Sprintf(`transform="translate(%.2f,%.2f) %v"`, x, y, extra))
 	io.WriteString(currentDocument.Writer, s.Doc)
 	currentDocument.Gend()
 }
@@ -147,7 +147,10 @@ func MergeEqualLayers(layers []Layer) []Layer {
 // Such files will be written in the directory outDirectory passed as input.
 // The format used for the SVG file names will contain the Zaxis, min and max, of the layer:
 // <outDirectory>/design-A-B-mm.svg, where A is the min Z, and B is the max Z.
-func WriteLayersToFile(outDirectory string, layers []Layer) {
+func WriteLayersToFile(outDirectory string, layers []Layer) (filesWritten []string) {
+
+	filePaths := make([]string, 0)
+
 	for _, l := range layers {
 		fmt.Println("++++ This filtered layer is [", l.Zmin, "-", l.Zmax, "]")
 
@@ -158,12 +161,30 @@ func WriteLayersToFile(outDirectory string, layers []Layer) {
 		canvas := svg.New(f)
 		canvas.StartviewUnit(200.0, 200.0, "mm", 0, 0, 200, 200) // TODO : parametric size, of course
 		canvas.Group(`stroke="rgb(255,0,0)" stroke-width="1pt" fill="none"`)
-
 		for _, cut := range l.Cuts {
-			importSvgElementsFromFile(canvas, cut.X, cut.Y, cut.File)
+			importSvgElementsFromFile(canvas, cut.X, cut.Y, cut.File, "")
 		}
-
 		canvas.Gend()
 		canvas.End()
+		filePaths = append(filePaths, f.Name())
 	}
+
+	return filePaths
+}
+
+// WriteVisual, given a list of SVG files, creates an SVG file represneting the stack fo the single
+// input SVGs. A sort of sandwich. Hereby the library name.
+func WriteVisual(outDirectory string, layers []Layer, fileNames []string) {
+	m, _ := os.Create(filepath.Join(outDirectory, "/design.svg"))
+	defer m.Close()
+
+	visual := svg.New(m)
+	visual.StartviewUnit(400.0, 400.0, "mm", 0, 0, 400, 400) // TODO : parametric size, of course
+	visual.Group(`stroke="rgb(255,0,0)" stroke-width="1pt" fill="none"`)
+	for i, f := range fileNames {
+		fmt.Println("++++ File : ", f)
+		importSvgElementsFromFile(visual, 50.0, 50+float64(i*100), f, "skewX(50)")
+	}
+	visual.Gend()
+	visual.End()
 }
