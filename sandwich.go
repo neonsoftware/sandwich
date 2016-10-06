@@ -46,7 +46,7 @@ func (l Layer) String() string {
 	for _, c := range l.Cuts {
 		inner += fmt.Sprintf("%v\n", c)
 	}
-	return fmt.Sprintf("[%v-%v] : %v\n", l.Zmin, l.Zmax, inner)
+	return fmt.Sprintf("z[%vmm-%vmm] : [%v]\n", l.Zmin, l.Zmax, inner)
 }
 
 // importSvgElementsFromFile reads an SVG and imports all the elements at (x,y) of currentDocument
@@ -70,6 +70,10 @@ func importSvgElementsFromFile(currentDocument *svg.SVG, x, y float64, fileName 
 	currentDocument.Group(fmt.Sprintf(`transform="translate(%.2f,%.2f) %v"`, x, y, extra))
 	io.WriteString(currentDocument.Writer, s.Doc)
 	currentDocument.Gend()
+}
+
+func isCutEquivalent(a Cut2D, b Cut2D) bool {
+	return a.File == b.File && a.X == b.X && a.Y == b.Y
 }
 
 func areCuts2DEquivalent(a []Cut2D, b []Cut2D) bool {
@@ -98,20 +102,29 @@ func SliceByMM(cuts []Cut3D) []Layer {
 
 	var layers []Layer
 
-	mmArranged2DCuts := make(map[int][]Cut2D)
+	maxHeight := 0
+	for _, cut3D := range cuts {
+		if cut3D.Zmax > maxHeight {
+			maxHeight = cut3D.Zmax
+		}
+	}
+
+	mmArranged2DCuts := make([][]Cut2D, maxHeight+1)
 
 	for _, cut3D := range cuts {
-		for i := cut3D.Zmin; i <= cut3D.Zmax; i++ {
+		for mm := cut3D.Zmin; mm <= cut3D.Zmax; mm++ {
 			//_, thereIsAnotherAlready := mmArranged2DCuts[i]
 			// if !thereIsAnotherAlready {
 			// 	mmArranged2DCuts[i] = make([]Cut2D, 0)
 			// }
-			mmArranged2DCuts[i] = append(mmArranged2DCuts[i], cut3D.Cut)
+			mmArranged2DCuts[mm] = append(mmArranged2DCuts[mm], cut3D.Cut)
 		}
 	}
 
-	for k, v := range mmArranged2DCuts {
-		layers = append(layers, Layer{k, k, v})
+	for mm, v := range mmArranged2DCuts {
+		if mm > 0 {
+			layers = append(layers, Layer{mm, mm, v})
+		}
 	}
 
 	return layers
@@ -125,8 +138,9 @@ func MergeEqualLayers(layers []Layer) []Layer {
 
 	var filtered []Layer
 
-	for _, currentLayer := range layers {
+	fmt.Println("To be filtered : ", layers)
 
+	for _, currentLayer := range layers {
 		// Check if another is already in and can be merged
 		merged := false
 		for indexOfAlreadyPresentLayer, _ := range filtered {
@@ -147,20 +161,20 @@ func MergeEqualLayers(layers []Layer) []Layer {
 // Such files will be written in the directory outDirectory passed as input.
 // The format used for the SVG file names will contain the Zaxis, min and max, of the layer:
 // <outDirectory>/design-A-B-mm.svg, where A is the min Z, and B is the max Z.
-func WriteLayersToFile(outDirectory string, layers []Layer) (filesWritten []string) {
+func WriteLayersToFile(outDirectory string, layers []Layer, xSizeMm float64, ySizeMm float64, groupParams string) (filesWritten []string) {
 
 	filePaths := make([]string, 0)
 
 	for _, l := range layers {
-		fmt.Println("++++ This filtered layer is [", l.Zmin, "-", l.Zmax, "]")
+		fmt.Println("++++ This filtered layer is ", l)
 
 		// Creating empty drawing
 		f, _ := os.Create(filepath.Join(outDirectory, "/design-"+strconv.Itoa(l.Zmin)+"-"+strconv.Itoa(l.Zmax)+".svg"))
 		defer f.Close()
 
 		canvas := svg.New(f)
-		canvas.StartviewUnit(200.0, 200.0, "mm", 0, 0, 200, 200) // TODO : parametric size, of course
-		canvas.Group(`stroke="rgb(255,0,0)" stroke-width="1pt" fill="none"`)
+		canvas.StartviewUnit(xSizeMm, ySizeMm, "mm", 0, 0, xSizeMm, ySizeMm) // TODO : check if float64 in w and h makes sense in SVG
+		canvas.Group(groupParams)
 		for _, cut := range l.Cuts {
 			importSvgElementsFromFile(canvas, cut.X, cut.Y, cut.File, "")
 		}
@@ -179,7 +193,7 @@ func WriteVisual(outDirectory string, layers []Layer, fileNames []string) {
 	defer m.Close()
 
 	visual := svg.New(m)
-	visual.StartviewUnit(400.0, 400.0, "mm", 0, 0, 400, 400) // TODO : parametric size, of course
+	visual.Startraw("") // TODO : parametric size, of course
 	visual.Group(`stroke="rgb(255,0,0)" stroke-width="1pt" fill="none"`)
 	for i, f := range fileNames {
 		fmt.Println("++++ File : ", f)
