@@ -10,7 +10,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
 )
 
 // Basic Types
@@ -26,8 +25,8 @@ func (c Cut2D) String() string {
 }
 
 type Cut3D struct {
-	Zmin int // where the cut should start, lowest point on Z axis, in mm
-	Zmax int // where the cut should end, lowest point on Z axis, in mm
+	Zmin float64 // where the cut should start, lowest point on Z axis, in mm
+	Zmax float64 // where the cut should end, lowest point on Z axis, in mm
 	Cut  Cut2D
 }
 
@@ -36,8 +35,8 @@ func (c Cut3D) String() string {
 }
 
 type Layer struct {
-	Zmin int     // where the layer should start, lowest point on Z axis, in mm
-	Zmax int     // where the layer should start, lowest point on Z axis, in mm
+	Zmin float64 // where the layer should start, lowest point on Z axis, in mm
+	Zmax float64 // where the layer should start, lowest point on Z axis, in mm
 	Cuts []Cut2D // All the cuts included in the layer
 }
 
@@ -99,32 +98,26 @@ func areCuts2DEquivalent(a []Cut2D, b []Cut2D) bool {
 // So if a Cut3D object with Zmin=2 and Zmax=4 is encountered, then its Cut2D objects are copied into
 // the layer for Z 2mm, 3mm, and 4mm.
 func SliceByMM(cuts []Cut3D) []Layer {
-
 	var layers []Layer
 
-	maxHeight := 0
+	var maxHeight float64 = 0.0
+
 	for _, cut3D := range cuts {
 		if cut3D.Zmax > maxHeight {
 			maxHeight = cut3D.Zmax
 		}
 	}
 
-	mmArranged2DCuts := make([][]Cut2D, maxHeight+1)
+	mmArranged2DCuts := make(map[float64][]Cut2D)
 
 	for _, cut3D := range cuts {
-		for mm := cut3D.Zmin; mm <= cut3D.Zmax; mm++ {
-			//_, thereIsAnotherAlready := mmArranged2DCuts[i]
-			// if !thereIsAnotherAlready {
-			// 	mmArranged2DCuts[i] = make([]Cut2D, 0)
-			// }
+		for mm := cut3D.Zmin; mm < cut3D.Zmax; mm += 0.5 {
 			mmArranged2DCuts[mm] = append(mmArranged2DCuts[mm], cut3D.Cut)
 		}
 	}
 
-	for mm, v := range mmArranged2DCuts {
-		if mm > 0 {
-			layers = append(layers, Layer{mm, mm, v})
-		}
+	for mm := 0.0; mm < maxHeight; mm += 0.5 {
+		layers = append(layers, Layer{mm, mm + 0.5, mmArranged2DCuts[mm]})
 	}
 
 	return layers
@@ -169,11 +162,12 @@ func WriteLayersToFile(outDirectory string, layers []Layer, xSizeMm float64, ySi
 		fmt.Println("++++ This filtered layer is ", l)
 
 		// Creating empty drawing
-		f, _ := os.Create(filepath.Join(outDirectory, "/design-"+strconv.Itoa(l.Zmin)+"-"+strconv.Itoa(l.Zmax)+".svg"))
+		fileName := fmt.Sprintf("design-%.1f-%.1f.svg", l.Zmin, l.Zmax)
+		f, _ := os.Create(filepath.Join(outDirectory, fileName))
 		defer f.Close()
 
 		canvas := svg.New(f)
-		canvas.StartviewUnit(xSizeMm, ySizeMm, "mm", 0, 0, xSizeMm, ySizeMm) // TODO : check if float64 in w and h makes sense in SVG
+		canvas.StartviewUnit(float64(xSizeMm), float64(ySizeMm), "mm", 0, 0, float64(xSizeMm), float64(ySizeMm)) // TODO : check if float64 in w and h makes sense in SVG
 		canvas.Group(groupParams)
 		for _, cut := range l.Cuts {
 			importSvgElementsFromFile(canvas, cut.X, cut.Y, cut.File, "")
