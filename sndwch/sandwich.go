@@ -20,18 +20,10 @@ type Cut2D struct {
 	Y    float64 // y offset, from top
 }
 
-func (c Cut2D) String() string {
-	return fmt.Sprintf("%v at (%v,%v)", c.File, c.X, c.Y)
-}
-
 type Cut3D struct {
 	Zmin float64 // where the cut should start, lowest point on Z axis, in mm
 	Zmax float64 // where the cut should end, lowest point on Z axis, in mm
 	Cut  Cut2D
-}
-
-func (c Cut3D) String() string {
-	return fmt.Sprintf("[%v-%v] %v", c.Zmin, c.Zmax, c.Cut)
 }
 
 type Layer struct {
@@ -40,6 +32,14 @@ type Layer struct {
 	Cuts []Cut2D // All the cuts included in the layer
 }
 
+// simple toString functions
+
+func (c Cut2D) String() string {
+	return fmt.Sprintf("%v at (%v,%v)", c.File, c.X, c.Y)
+}
+func (c Cut3D) String() string {
+	return fmt.Sprintf("[%v-%v] %v", c.Zmin, c.Zmax, c.Cut)
+}
 func (l Layer) String() string {
 	var inner string
 	for _, c := range l.Cuts {
@@ -180,9 +180,9 @@ func WriteLayersToFile(outDirectory string, layers []Layer, xSizeMm float64, ySi
 	return filePaths
 }
 
-// WriteVisual, given a list of SVG files, creates an SVG file represneting the stack fo the single
+// WriteVisual, given a list of SVG files, creates an SVG file represneting the stack for the single
 // input SVGs. A sort of sandwich. Hereby the library name.
-func WriteVisual(outDirectory string, layers []Layer, fileNames []string) {
+func WriteVisual(outDirectory string, fileNames []string) {
 	m, _ := os.Create(filepath.Join(outDirectory, "/design.svg"))
 	defer m.Close()
 
@@ -195,4 +195,14 @@ func WriteVisual(outDirectory string, layers []Layer, fileNames []string) {
 	}
 	visual.Gend()
 	visual.End()
+}
+
+// Makesandwich takes a slice of Cut3D struct 'cuts', creates a sandwich, and writes all the layers' SVG files
+// to dir 'outDirectory'
+func MakeSandwich(outDirectory string, all3DCuts []Cut3D, xSizeMm float64, ySizeMm float64, groupParams string) (string, error) {
+	layersOnePerMM := SliceByMM(all3DCuts)
+	finalLayers := MergeEqualLayers(layersOnePerMM)
+	filePaths := WriteLayersToFile(outDirectory, finalLayers, xSizeMm, ySizeMm, groupParams)
+	WriteVisual(outDirectory, filePaths)
+	return "ok", nil
 }
