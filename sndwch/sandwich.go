@@ -101,10 +101,14 @@ func SliceByMM(cuts []Cut3D) []Layer {
 	var layers []Layer
 
 	var maxHeight float64 = 0.0
+	var minHeight float64 = 0.0
 
 	for _, cut3D := range cuts {
 		if cut3D.Zmax > maxHeight {
 			maxHeight = cut3D.Zmax
+		}
+		if cut3D.Zmin < minHeight {
+			minHeight = cut3D.Zmin
 		}
 	}
 
@@ -116,7 +120,7 @@ func SliceByMM(cuts []Cut3D) []Layer {
 		}
 	}
 
-	for mm := 0.0; mm < maxHeight; mm += 0.5 {
+	for mm := minHeight; mm < maxHeight; mm += 0.5 {
 		layers = append(layers, Layer{mm, mm + 0.5, mmArranged2DCuts[mm]})
 	}
 
@@ -180,7 +184,7 @@ func WriteLayersToFile(outDirectory string, layers []Layer, xSizeMm float64, ySi
 	return filePaths
 }
 
-// WriteVisual, given a list of SVG files, creates an SVG file represneting the stack for the single
+// WriteVisual, given a list of SVG files, creates an SVG file representinf the stack for the single
 // input SVGs. A sort of sandwich. Hereby the library name.
 func WriteVisual(outDirectory string, fileNames []string) {
 	m, _ := os.Create(filepath.Join(outDirectory, "/design.svg"))
@@ -189,9 +193,11 @@ func WriteVisual(outDirectory string, fileNames []string) {
 	visual := svg.New(m)
 	visual.Startraw("") // TODO : parametric size, of course
 	visual.Group(`stroke="rgb(255,0,0)" stroke-width="1pt" fill="none"`)
+
 	for i, f := range fileNames {
 		fmt.Println("++++ File : ", f)
-		importSvgElementsFromFile(visual, 50.0, 50+float64(i*100), f, "skewX(50)")
+		y_insertion := len(fileNames) - i // we reverse, want the first one on the bottom, and so on ...
+		importSvgElementsFromFile(visual, 50.0, 50+float64(y_insertion*100), f, "skewX(50)")
 	}
 	visual.Gend()
 	visual.End()
