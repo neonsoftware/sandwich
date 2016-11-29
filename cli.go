@@ -48,7 +48,7 @@ Options:
 		path := parts[0]
 		cuts = append(cuts, sandwich.Cut3D{zMin, zMax, sandwich.Cut2D{path, x, y}})
 
-		sandwich.MakeSandwich(arguments["<out>"].(string), cuts, arguments["<size_x>"].(float64), arguments["<size_y>"].(float64), `stroke="rgb(255,0,0)" stroke-width="0.2pt" fill="none"`)
+		sandwich.MakeSandwich(arguments["<out>"].(string), cuts, 0,0,arguments["<size_x>"].(float64), arguments["<size_y>"].(float64), `stroke="rgb(255,0,0)" stroke-width="0.2pt" fill="none"`)
 	}
 
 }
