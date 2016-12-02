@@ -158,7 +158,7 @@ func MergeEqualLayers(layers []Layer) []Layer {
 // Such files will be written in the directory outDirectory passed as input.
 // The format used for the SVG file names will contain the Zaxis, min and max, of the layer:
 // <outDirectory>/design-A-B-mm.svg, where A is the min Z, and B is the max Z.
-func WriteLayersToFile(outDirectory string, layers []Layer, xSizeMm float64, ySizeMm float64, groupParams string) (filesWritten []string) {
+func WriteLayersToFile(outDirectory string, layers []Layer, x float64, y float64, xSizeMm float64, ySizeMm float64, groupParams string) (filesWritten []string) {
 
 	filePaths := make([]string, 0)
 
@@ -170,8 +170,9 @@ func WriteLayersToFile(outDirectory string, layers []Layer, xSizeMm float64, ySi
 		f, _ := os.Create(filepath.Join(outDirectory, fileName))
 		defer f.Close()
 
+		// TODO : check if float64 in w and h makes sense in SVG
 		canvas := svg.New(f)
-		canvas.StartviewUnit(float64(xSizeMm), float64(ySizeMm), "mm", 0, 0, float64(xSizeMm), float64(ySizeMm)) // TODO : check if float64 in w and h makes sense in SVG
+		canvas.StartviewUnit(float64(xSizeMm), float64(ySizeMm), "mm", x, y, float64(xSizeMm), float64(ySizeMm))
 		canvas.Group(groupParams)
 		for _, cut := range l.Cuts {
 			importSvgElementsFromFile(canvas, cut.X, cut.Y, cut.File, "")
@@ -205,10 +206,10 @@ func WriteVisual(outDirectory string, fileNames []string) {
 
 // Makesandwich takes a slice of Cut3D struct 'cuts', creates a sandwich, and writes all the layers' SVG files
 // to dir 'outDirectory'
-func MakeSandwich(outDirectory string, all3DCuts []Cut3D, xSizeMm float64, ySizeMm float64, groupParams string) (string, error) {
+func MakeSandwich(outDirectory string, all3DCuts []Cut3D, x float64, y float64, xSizeMm float64, ySizeMm float64, groupParams string) (string, error) {
 	layersOnePerMM := SliceByMM(all3DCuts)
 	finalLayers := MergeEqualLayers(layersOnePerMM)
-	filePaths := WriteLayersToFile(outDirectory, finalLayers, xSizeMm, ySizeMm, groupParams)
+	filePaths := WriteLayersToFile(outDirectory, finalLayers, x, y, xSizeMm, ySizeMm, groupParams)
 	WriteVisual(outDirectory, filePaths)
 	return "ok", nil
 }
