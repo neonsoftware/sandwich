@@ -5,6 +5,7 @@ package sandwich
 
 import (
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"github.com/ajstarks/svgo/float"
 	"io"
@@ -49,7 +50,7 @@ func (l Layer) String() string {
 }
 
 // importSvgElementsFromFile reads an SVG and imports all the elements at (x,y) of currentDocument
-func importSvgElementsFromFile(currentDocument *svg.SVG, x, y float64, fileName string, extra string) {
+func importSvgElementsFromFile(currentDocument *svg.SVG, x, y float64, fileName string, extra string) error {
 
 	var s struct {
 		Doc string `xml:",innerxml"`
@@ -57,18 +58,18 @@ func importSvgElementsFromFile(currentDocument *svg.SVG, x, y float64, fileName 
 
 	f, err := os.Open(fileName)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		return
+		return errors.New("SVG file ot found: " + fileName)
 	}
 	defer f.Close()
-	if err := xml.NewDecoder(f).Decode(&s); err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to parse (%v)\n", err)
-		return
+	if err = xml.NewDecoder(f).Decode(&s); err != nil {
+		return errors.New("SVG unable to parse: " + fileName)
 	}
 
 	currentDocument.Group(fmt.Sprintf(`transform="translate(%.2f,%.2f) %v"`, x, y, extra))
 	io.WriteString(currentDocument.Writer, s.Doc)
 	currentDocument.Gend()
+
+	return nil
 }
 
 func isCutEquivalent(a Cut2D, b Cut2D) bool {
@@ -158,7 +159,7 @@ func MergeEqualLayers(layers []Layer) []Layer {
 // Such files will be written in the directory outDirectory passed as input.
 // The format used for the SVG file names will contain the Zaxis, min and max, of the layer:
 // <outDirectory>/design-A-B-mm.svg, where A is the min Z, and B is the max Z.
-func WriteLayersToFile(outDirectory string, layers []Layer, x float64, y float64, xSizeMm float64, ySizeMm float64, groupParams string) (filesWritten []string) {
+func WriteLayersToFile(outDirectory string, layers []Layer, x float64, y float64, xSizeMm float64, ySizeMm float64, groupParams string) (filesWritten []string, err error) {
 
 	filePaths := make([]string, 0)
 
@@ -167,7 +168,10 @@ func WriteLayersToFile(outDirectory string, layers []Layer, x float64, y float64
 
 		// Creating empty drawing
 		fileName := fmt.Sprintf("design-%.1f-%.1f.svg", l.Zmin, l.Zmax)
-		f, _ := os.Create(filepath.Join(outDirectory, fileName))
+		f, err := os.Create(filepath.Join(outDirectory, fileName))
+		if err != nil {
+			return filePaths, errors.New("SVG could not create file: " + filepath.Join(outDirectory, fileName))
+		}
 		defer f.Close()
 
 		// TODO : check if float64 in w and h makes sense in SVG
@@ -175,14 +179,16 @@ func WriteLayersToFile(outDirectory string, layers []Layer, x float64, y float64
 		canvas.StartviewUnit(float64(xSizeMm), float64(ySizeMm), "mm", x, y, float64(xSizeMm), float64(ySizeMm))
 		canvas.Group(groupParams)
 		for _, cut := range l.Cuts {
-			importSvgElementsFromFile(canvas, cut.X, cut.Y, cut.File, "")
+			if err := importSvgElementsFromFile(canvas, cut.X, cut.Y, cut.File, ""); err != nil {
+				return filePaths, err
+			}
 		}
 		canvas.Gend()
 		canvas.End()
 		filePaths = append(filePaths, f.Name())
 	}
 
-	return filePaths
+	return filePaths, nil
 }
 
 // WriteVisual, given a list of SVG files, creates an SVG file representinf the stack for the single
@@ -206,10 +212,13 @@ func WriteVisual(outDirectory string, fileNames []string) {
 
 // Makesandwich takes a slice of Cut3D struct 'cuts', creates a sandwich, and writes all the layers' SVG files
 // to dir 'outDirectory'
-func MakeSandwich(outDirectory string, all3DCuts []Cut3D, x float64, y float64, xSizeMm float64, ySizeMm float64, groupParams string) (string, error) {
+func MakeSandwich(outDirectory string, all3DCuts []Cut3D, x float64, y float64, xSizeMm float64, ySizeMm float64, groupParams string) error {
 	layersOnePerMM := SliceByMM(all3DCuts)
 	finalLayers := MergeEqualLayers(layersOnePerMM)
-	filePaths := WriteLayersToFile(outDirectory, finalLayers, x, y, xSizeMm, ySizeMm, groupParams)
+	filePaths, err := WriteLayersToFile(outDirectory, finalLayers, x, y, xSizeMm, ySizeMm, groupParams)
+	if err != nil {
+		return err
+	}
 	WriteVisual(outDirectory, filePaths)
-	return "ok", nil
+	return nil
 }
